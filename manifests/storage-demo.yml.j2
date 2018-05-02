@@ -1,0 +1,138 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: storage-demo-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  name: cluster-admin
+  kind: ClusterRole
+subjects:
+- kind: ServiceAccount
+  name: storage-demo
+  namespace: {{ KUBEVIRT_NS }}
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: storage-demo-default-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  name: cluster-admin
+  kind: ClusterRole
+subjects:
+- kind: ServiceAccount
+  name: storage-demo
+  namespace: default
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: storage-demo
+  namespace: "{{ KUBEVIRT_NS }}"
+  labels:
+    app: storage-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage-demo
+  template:
+    metadata:
+      labels:
+        app: storage-demo
+    spec:
+      serviceAccountName: storage-demo
+      nodeSelector:
+          "kubernetes.io/hostname": "localhost"
+      hostNetwork: true
+      containers:
+      - name: ceph
+        args: ["demo"]
+        env:
+        - name: MON_IP
+          value: {{ IP }}
+        - name: CEPH_PUBLIC_NETWORK
+          value: "0.0.0.0/0"
+        - name: RGW_CIVETWEB_PORT
+          value: "81" # Don't clash with openshift
+        - name: CEPH_DEMO_UID
+          value: demo
+        ports:
+          - containerPort: 6789
+            hostPort: 6789
+        imagePullPolicy: IfNotPresent
+        image: ceph/daemon:v3.0.3-stable-3.0-luminous-centos-7-x86_64
+        volumeMounts:
+        - name: cephvarlib
+          mountPath: /var/lib/ceph
+        - name: cephetc
+          mountPath: /etc/ceph
+      - name: mariadb
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password"
+        - name: MYSQL_DATABASE
+          value: "cinder"
+        - name: MYSQL_USER
+          value: "cinder"
+        - name: MYSQL_PASSWORD
+          value: "password"
+        imagePullPolicy: IfNotPresent
+        image: mariadb
+        volumeMounts:
+        - name: mariadbdata
+          mountPath: "/var/lib/mysql"
+      - name: rabbitmq
+        imagePullPolicy: IfNotPresent
+        image: rabbitmq
+      - name: cinder-api
+        imagePullPolicy: IfNotPresent
+        image: aglitke/cinder:ocata-luminous
+        command: ["/scripts/cinder-api.sh"]
+        env:
+        - name: INIT_DB
+          value: "true"
+      - name: cinder-scheduler
+        imagePullPolicy: IfNotPresent
+        image: aglitke/cinder:ocata-luminous
+        command: ["cinder-scheduler"]
+      - name: cinder-volume
+        imagePullPolicy: IfNotPresent
+        image: aglitke/cinder:ocata-luminous
+        command: ["/scripts/ceph-service.sh"]
+        env:
+        - name: MON_IP
+          value: {{ IP }}
+        volumeMounts:
+        - name: cephetc
+          mountPath: "/etc/ceph"
+      - name: cinder-provisioner
+        imagePullPolicy: IfNotPresent
+        image: quay.io/aglitke/standalone-cinder-provisioner:sprint4
+        env:
+        - name: OS_CINDER_ENDPOINT
+          value: http://127.0.0.1:8776/v3
+      volumes:
+      - name: cephvarlib
+        emptyDir: {}
+      - name: cephetc
+        emptyDir: {}
+      - name: mariadbdata
+        emptyDir: {}
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: kubevirt
+provisioner: openstack.org/standalone-cinder
+parameters:
+  smartclone: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubevirt-cephx-secret
+type: "kubernetes.io/rbd"
+data:
+  key: QVFDMkI0SmE2MDgzT3hBQTdOR0dpb0xpR1lqOHlJTFpkYUI1T0E9PQo=
+

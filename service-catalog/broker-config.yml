@@ -1,0 +1,51 @@
+apiVersion: v1
+data:
+  broker-config: |
+    registry:
+      - type: dockerhub
+        name: dh
+        url: https://registry.hub.docker.com
+        org: aglitke
+        tag: latest
+        white_list:
+          - '.*-apb$'
+    dao:
+      type: crd
+    log:
+      logfile: /var/log/ansible-service-broker/asb.log
+      stdout: true
+      level: debug
+      color: true
+    openshift:
+      host: ''
+      ca_file: ''
+      bearer_token_file: ''
+      image_pull_policy: IfNotPresent
+      sandbox_role: edit
+      namespace: ansible-service-broker
+      keep_namespace: false
+      keep_namespace_on_error: true
+    broker:
+      dev_broker: true
+      bootstrap_on_startup: true
+      refresh_interval: 60s
+      launch_apb_on_bind: false
+      output_request: true
+      recovery: false
+      ssl_cert_key: /etc/tls/private/tls.key
+      ssl_cert: /etc/tls/private/tls.crt
+      auto_escalate: True
+      cluster_url: ansible-service-broker
+      auth:
+        - type: basic
+          enabled: False
+kind: ConfigMap
+metadata:
+  creationTimestamp: 2018-04-27T18:31:09Z
+  labels:
+    app: ansible-service-broker
+  name: broker-config
+  namespace: ansible-service-broker
+  resourceVersion: "9550"
+  selfLink: /api/v1/namespaces/ansible-service-broker/configmaps/broker-config
+  uid: 2782c009-4a49-11e8-8285-4e3edd9a563d
