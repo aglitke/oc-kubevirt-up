@@ -3,13 +3,14 @@
 export KUBEVIRT_NS=kube-system
 export CDI_NS=golden-images
 export IP=`ip -o -4 a | tr -s ' ' | grep -v -e ' lo[0-9:]*.*$' | cut -d     ' ' -f 4 | head -1 | sed 's#/.*##'`
-
+DATA_DIR="`pwd`/_data"
 #
 # Cluster
 #
-oc cluster up --service-catalog --public-hostname="$IP" --routing-suffix="$IP.nip.io"
+mkdir -p $DATA_DIR
+oc cluster up --service-catalog --public-hostname="$IP" --routing-suffix="$IP.nip.io" --host-data-dir=$DATA_DIR --use-existing-config=true
 
-oc login -u system:admin --insecure-skip-tls-verify=true
+oc login -u system:admin --insecure-skip-tls-verify=true https://$IP:8443
 
 #
 # Storage
